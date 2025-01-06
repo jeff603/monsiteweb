@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prédiction de Couleurs Élite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white; /* Fond blanc */
+            color: #333;
+        }
+        h1 {
+            color: #5b5b5b;
+        }
+        label {
+            margin: 5px 0;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .right-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .btn-predict {
+            background-color: #28a745; /* Vert */
+        }
+        .btn-predict:hover {
+            background-color: #218838;
+        }
+        .btn-clear {
+            background-color: #dc3545; /* Rouge */
+        }
+        .btn-clear:hover {
+            background-color: #c82333;
+        }
+        .btn-history, .btn-undo {
+            background-color: #007bff; /* Bleu */
+        }
+        .btn-history:hover, .btn-undo:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745; /* Vert */
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-failure {
+            background-color: #dc3545; /* Rouge */
+        }
+        .btn-failure:hover {
+            background-color: #c82333;
+        }
+        .color-input {
+            padding: 5px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        #firstColor {
+            background-color: #ffcccc; /* Couleur de fond rouge clair */
+        }
+        #secondColor {
+            background-color: #ccffcc; /* Couleur de fond vert clair */
+        }
+        #thirdColor {
+            background-color: #ccffcc; /* Couleur de fond vert clair */
+        }
+        #mostFrequentColor {
+            background-color: #ffffcc; /* Couleur de fond jaune clair */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f0f0f0; /* Arrière-plan gris clair */
+        }
+        #historyContainer {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prédiction de Couleurs Élite</h1>
+    <label for="firstColor">Ajouter la Première Couleur :</label>
+    <input type="text" id="firstColor" class="color-input" oninput="removeAccents(this)" placeholder="Entrer rouge ou vert"><br>
+    <label for="secondColor">Ajouter la Deuxième Couleur :</label>
+    <input type="text" id="secondColor" class="color-input" oninput="removeAccents(this)" placeholder="Entrer rouge ou vert"><br>
+    <label for="thirdColor">Ajouter la Troisième Couleur :</label>
+    <input type="text" id="thirdColor" class="color-input" oninput="removeAccents(this)" placeholder="Entrer rouge ou vert"><br>
+    <label for="mostFrequentColor">Couleur la Plus Récurrente (ou Egal) :</label>
+    <input type="text" id="mostFrequentColor" class="color-input" oninput="removeAccents(this)" placeholder="Entrer rouge, vert ou egal"><br>
+    <div class="action-buttons">
+        <button class="btn-predict" onclick="predictColor()">Prédire</button>
+        <button class="btn-clear" onclick="clearFields()">Effacer</button>
+    </div>
+    <div class="right-buttons">
+        <button class="btn-history" onclick="clearHistory()">Effacer l'Historique</button>
+        <button class="btn-undo" onclick="undo()">Marche Arrière</button>
+    </div>
+    <p id="predictionResult"></p>
+    <p id="previousResult"></p> <!-- Message pour les résultats précédents -->
+    <label for="correctPrediction">Prédiction Incorrecte :</label>
+    <input type="text" id="correctPrediction" class="color-input" placeholder="Entrer la prédiction correcte"><br>
+    <button class="btn-history" onclick="correctPrediction()">Corriger Prédiction</button>
+    <h2>Historique</h2>
+    <div id="historyContainer" class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>COULEURS</th>
+                    <th>PRÉDICTION</th>
+                    <th>COULEUR RÉCURRENTE</th>
+                    <th>RÉSULTAT</th>
+                </tr>
+            </thead>
+            <tbody id="history">
+            </tbody>
+        </table>
+    </div>
+    <p id="successRate"></p>
+    <p id="totalPredictions">Total des Prédictions : 0</p>
+    <p id="totalSuccesses">Total des Réussites : 0</p>
+    <p id="totalFailures">Total des Pertes : 0</p> <!-- Ajout du total des pertes -->
+    <button class="btn-success" onclick="giveFeedback(true)">Gagner ✅</button>
+    <button class="btn-failure" onclick="giveFeedback(false)">Perte ❌</button>
+
+    <script>
+        let history = [];
+        let previousHistory = [];
+        let consecutiveLosses = 0;
+        let successes = 0;
+        let failures = 0; // Ajout du compteur des pertes
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistoryFromLocalStorage();
+        });
+
+        function predictColor() {
+            const firstColor = document.getElementById('firstColor').value.toLowerCase();
+            const secondColor = document.getElementById('secondColor').value.toLowerCase();
+            const thirdColor = document.getElementById('thirdColor').value.toLowerCase();
+            const mostFrequentColor = document.getElementById('mostFrequentColor').value.toLowerCase();
+            const validColors = ['rouge', 'vert', 'egal'];
+
+            if (!validColors.includes(firstColor) || !validColors.includes(secondColor) || !validColors.includes(thirdColor) || !validColors.includes(mostFrequentColor)) {
+                alert('Veuillez entrer "rouge", "vert" ou "egal" uniquement.');
+                return;
+            }
+
+            const lastColors = [firstColor, secondColor, thirdColor];
+
+            let nextColor;
+
+            // Algorithme de prédiction basé sur les motifs fournis et la couleur la plus récurrente
+            if (lastColors.every(color => color === 'vert')) {
+                nextColor = 'vert';
+            } else if (lastColors.every(color => color === 'rouge')) {
+                nextColor = 'rouge';
+            } else if (lastColors[lastColors.length - 1] === 'vert' && lastColors.includes('rouge')) {
+                nextColor = 'rouge';
+            } else if (lastColors[lastColors.length - 1] === 'rouge' && lastColors.includes('vert')) {
+                nextColor = 'vert';
+            } else if (mostFrequentColor === 'egal') {
+                nextColor = lastColors[lastColors.length - 1] === 'rouge' ? 'vert' : 'rouge';
+            } else {
+                nextColor = mostFrequentColor; // Utiliser la couleur la plus récurrente pour la prédiction
+            }
+
+            // Vérifier si la prédiction existe déjà dans l'historique
+            const previousResult = history.find(record => record.colors === lastColors.join(', '));
+
+            if (previousResult) {
+                displayPreviousResult(previousResult);
+            } else {
+                document.getElementById('previousResult').textContent = ''; // Effacer le message précédent
+            }
+
+            previousHistory = [...history]; // Sauvegarde de l'historique actuel
+            history.push({ colors: lastColors.join(', '), prediction: nextColor, frequentColor: mostFrequentColor, result: '' });
+
+            const predictionResult = document.getElementById('predictionResult');
+            predictionResult.textContent = "Prédiction : " + nextColor;
+
+            updateHistory();
+        }
+
+        function displayPreviousResult(previousResult) {
+            const resultMessage = `Cette prédiction existe déjà dans l'historique. Prédiction : ${previousResult.prediction}, Résultat : ${previousResult.result}, Couleur Récurrente : ${previousResult.frequentColor}`;
+            document.getElementById('previousResult').textContent = resultMessage;
+        }
+
+        function clearFields() {
+            document.getElementById('firstColor').value = '';
+            document.getElementById('secondColor').value = '';
+            document.getElementById('thirdColor').value = '';
+            document.getElementById('mostFrequentColor').value = '';
+            document.getElementById('predictionResult').textContent = '';
+            document.getElementById('previousResult').textContent = ''; // Effacer le message précédent
+        }
+
+        function giveFeedback(correct) {
+            if (correct) {
+                consecutiveLosses = 0; // Réinitialiser les pertes consécutives
+                history[history.length - 1].result = 'Succès';
+                successes += 1;
+            } else {
+                consecutiveLosses += 1; // Incrémenter les pertes consécutives
+                history[history.length - 1].result = 'Échec';
+                failures += 1; // Ajouter à l'échec
+            }
+            updateHistory();
+            updateSuccessRate();
+        }
+
+        function correctPrediction() {
+            const correctPrediction = document.getElementById('correctPrediction').value.toLowerCase();
+            const validColors = ['rouge', 'vert', 'egal'];
+
+            if (!validColors.includes(correctPrediction)) {
+                alert('Veuillez entrer "rouge", "vert" ou "egal" uniquement.');
+                return;
+            }
+
+            history[history.length - 1].prediction = correctPrediction;
+            updateHistory();
+            document.getElementById('correctPrediction').value = ''; // Effacer le champ de correction
+        }
+
+        function updateHistory() {
+            const historyElement = document.getElementById('history');
+            historyElement.innerHTML = '';
+            history.forEach((record, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="background-color:#f8d7da;">${record.colors}</td><td style="background-color:#d4edda;">${record.prediction}</td><td style="background-color:#fff3cd;">${record.frequentColor}</td><td style="background-color:#f5c6cb;">${record.result}</td>`;
+                historyElement.appendChild(tr);
+            });
+            saveHistoryToLocalStorage(); // Sauvegarder après mise à jour
+            updateStats();
+        }
+
+        function clearHistory() {
+            previousHistory = [...history]; // Sauvegarde de l'historique actuel
+            history = [];
+            successes = 0; // Réinitialiser les réussites
+            failures = 0; // Réinitialiser les pertes
+            updateHistory();
+            updateSuccessRate();
+            updateStats(); // Mettre à jour les statistiques après effacement
+        }
+
+        function undo() {
+            history = [...previousHistory]; // Restaure l'historique précédent
+            updateHistory();
+            updateSuccessRate();
+            updateStats(); // Mettre à jour les statistiques après restauration
+        }
+
+        function updateSuccessRate() {
+            const successRate = (successes / history.length) * 100;
+            document.getElementById('successRate').textContent = `Taux de réussite : ${successRate.toFixed(2)}%`;
+        }
+
+        function saveHistoryToLocalStorage() {
+            localStorage.setItem('predictionHistory', JSON.stringify(history));
+        }
+
+        function loadHistoryFromLocalStorage() {
+            const storedHistory = localStorage.getItem('predictionHistory');
+            if (storedHistory) {
+                history = JSON.parse(storedHistory);
+                updateHistory();
+                updateSuccessRate();
+                updateStats(); // Mettre à jour les statistiques après chargement
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalPredictions').textContent = `Total des Prédictions : ${history.length}`;
+            document.getElementById('totalSuccesses').textContent = `Total des Réussites : ${successes}`;
+            document.getElementById('totalFailures').textContent = `Total des Pertes : ${failures}`; // Mise à jour des pertes
+        }
+
+        // Fonction pour enlever les accents des entrées
+        function removeAccents(input) {
+            const accentsMap = {
+                'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'æ': 'ae', 'ç': 'c',
+                'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+                'ñ': 'n', 'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ø': 'o', 'ú': 'u',
+                'ù': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y', 'ÿ': 'y', 'Á': 'A', 'À': 'A', 'Â': 'A',
+                'Ä': 'A', 'Ã': 'A', 'Å': 'A', 'Æ': 'AE', 'Ç': 'C', 'É': 'E', 'È': 'E', 'Ê': 'E',
+                'Ë': 'E', 'Í': 'I', 'Ì': 'I', 'Î': 'I', 'Ï': 'I', 'Ñ': 'N', 'Ó': 'O', 'Ò': 'O',
+                'Ô': 'O', 'Ö': 'O', 'Õ': 'O', 'Ø': 'O', 'Ú': 'U', 'Ù': 'U', 'Û': 'U', 'Ü': 'U',
+                'Ý': 'Y'
+            };
+            input.value = input.value.split('').map(char => accentsMap[char] || char).join('');
+        }
+    </script>
+</body>
+</html>
